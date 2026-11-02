@@ -3,7 +3,7 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyName>SMT.NQOL</AssemblyName>
     <RootNamespace>SMT.PriceGun200</RootNamespace>
-    <Version>0.7.2</Version>
+    <Version>0.8.0</Version>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
