@@ -47,6 +47,18 @@ jobs:
         shell: pwsh
         run: pwsh -NoProfile -File ./src/Tests/optimization.ps1
 
+      - name: Regression - reflection caches
+        shell: pwsh
+        run: pwsh -NoProfile -File ./src/Tests/reflection-cache.ps1
+
+      - name: Regression - checkout discovery cache
+        shell: pwsh
+        run: pwsh -NoProfile -File ./src/Tests/checkout-cache.ps1
+
+      - name: Regression - source structure
+        shell: pwsh
+        run: pwsh -NoProfile -File ./src/Tests/structure.ps1
+
       - name: Regression - core behavior
         shell: pwsh
         run: pwsh -NoProfile -File ./src/Tests/verify.ps1
