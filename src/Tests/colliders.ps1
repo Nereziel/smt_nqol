@@ -1,6 +1,6 @@
 ﻿$ErrorActionPreference = 'Stop'
-$geometry = Get-Content (Join-Path $PSScriptRoot '../CheckoutColliderGeometry.cs') -Raw
-$repair = Get-Content (Join-Path $PSScriptRoot '../CheckoutColliderRepair.cs') -Raw
+$geometry = Get-Content (Join-Path $PSScriptRoot '../Features/Checkout/CheckoutColliderGeometry.cs') -Raw
+$repair = Get-Content (Join-Path $PSScriptRoot '../Features/Checkout/CheckoutColliderRepair.cs') -Raw
 function Wrap-Source([string] $source) {
     $source = $source.Replace('using System;', '').Replace('using System.Collections.Generic;', '').Replace('using BepInEx.Logging;', '').Replace('using UnityEngine;', '')
     $source.Replace('namespace SMT.PriceGun200;', 'namespace SMT.PriceGun200 {') + "`n}"
