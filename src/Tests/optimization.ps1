@@ -11,7 +11,7 @@ if ($holdSource -match '\.OrderBy\s*\(' -or $holdSource -match '\.ToArray\s*\(')
     throw 'Held checkout product selection must not sort/copy the full scene product list.'
 }
 
-if ($holdSource -match '^using System\.Linq;' -im) {
+if ($holdSource -imatch '^using System\.Linq;') {
     throw 'CheckoutHoldController no longer needs LINQ after single-pass product selection.'
 }
 
