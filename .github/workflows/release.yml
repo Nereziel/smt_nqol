@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      - 'release/v*'
 
 permissions:
   contents: write
@@ -20,6 +22,16 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+
+      - name: Determine release tag
+        shell: pwsh
+        run: |
+          $refName = '${{ github.ref_name }}'
+          $tag = if ($refName.StartsWith('release/')) { $refName.Substring(8) } else { $refName }
+          if ($tag -notmatch '^v\d+\.\d+\.\d+([-.].+)?$') {
+            throw "Invalid release tag: $tag"
+          }
+          "RELEASE_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Restore
         run: dotnet restore SMT.NQOL.csproj
@@ -50,8 +62,7 @@ jobs:
       - name: Package release
         shell: pwsh
         run: |
-          $tag = '${{ github.ref_name }}'
-          $packageName = "SMT.NQOL-$tag"
+          $packageName = "SMT.NQOL-$env:RELEASE_TAG"
           $staging = Join-Path 'dist' $packageName
           $zip = Join-Path 'dist' "$packageName.zip"
 
@@ -64,13 +75,22 @@ jobs:
       - name: Upload packaged artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SMT.NQOL-${{ github.ref_name }}
+          name: SMT.NQOL-${{ env.RELEASE_TAG }}
           path: dist/*.zip
           if-no-files-found: error
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          target_commitish: ${{ github.sha }}
+          name: SMT NQOL ${{ env.RELEASE_TAG }}
           files: dist/*.zip
           generate_release_notes: true
           fail_on_unmatched_files: true
+
+      - name: Remove temporary release branch
+        if: startsWith(github.ref, 'refs/heads/release/')
+        continue-on-error: true
+        shell: pwsh
+        run: git push origin --delete "${{ github.ref_name }}"
