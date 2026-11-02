@@ -58,13 +58,13 @@ $methods
     private static void Check(bool v,string m) { if(!v) throw new Exception(m); }
     public static void Run() {
         var bridge=new ReconnectHarness();
-        var first=new ProductListing(); ProductListing.Instance=first; Object.Scene=new Object[]{first};
+        var first=new ProductListing(); ProductListing.Instance=first; UnityEngine.Object.Scene=new UnityEngine.Object[]{first};
         Check(bridge.Resolve() && ReferenceEquals(bridge.Current,first),"Initial connection failed");
-        bridge.SeedMethods(); first.Destroyed=true; Object.Scene=Array.Empty<Object>();
+        bridge.SeedMethods(); first.Destroyed=true; UnityEngine.Object.Scene=Array.Empty<UnityEngine.Object>();
         Check(!bridge.Resolve() && bridge.Current==null && bridge.MethodsCleared,"Destroyed wrapper survived disconnect");
-        var second=new ProductListing(); ProductListing.Instance=second; Object.Scene=new Object[]{second};
+        var second=new ProductListing(); ProductListing.Instance=second; UnityEngine.Object.Scene=new UnityEngine.Object[]{second};
         Check(bridge.Resolve() && ReferenceEquals(bridge.Current,second),"Reconnect failed");
-        bridge.SeedMethods(); var third=new ProductListing(); ProductListing.Instance=third; Object.Scene=new Object[]{third};
+        bridge.SeedMethods(); var third=new ProductListing(); ProductListing.Instance=third; UnityEngine.Object.Scene=new UnityEngine.Object[]{third};
         Check(bridge.Resolve() && ReferenceEquals(bridge.Current,third) && bridge.MethodsCleared,"Session replacement kept methods");
         ProductListing.Instance=first; Check(bridge.Resolve() && ReferenceEquals(bridge.Current,third),"Destroyed singleton blocked fallback");
         third.isClient=false; Check(!bridge.Resolve(),"Disconnected listing accepted");
