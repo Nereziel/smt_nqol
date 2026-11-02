@@ -25,7 +25,7 @@ public sealed partial class Plugin
     private sealed class MenuDraft
     {
         internal bool Enabled, Scanner, RequireScanner, Checkout, Hold, Debug, FixColliders;
-        internal string Multiplier = "", Rounding = "", Distance = "", Interval = "", PickupDelay = "", ConfirmDelay = "";
+        internal string Multiplier = "", Distance = "", Interval = "", PickupDelay = "", ConfirmDelay = "";
         internal KeyboardShortcut ScannerKey;
         internal KeyboardShortcut CheckoutKey;
     }
@@ -160,8 +160,7 @@ public sealed partial class Plugin
         GUILayout.Label("SCANNER – cenovky regálů");
         _draft.Scanner = GUILayout.Toggle(_draft.Scanner, "Zapnout změnu cen");
         _draft.RequireScanner = GUILayout.Toggle(_draft.RequireScanner, "Vyžadovat držený scanner");
-        NumberRow("Násobek market price (2 = 200 %)", ref _draft.Multiplier);
-        NumberRow("Zaokrouhlení dolů (0 vypne)", ref _draft.Rounding);
+        NumberRow("Násobek market price (2.01 = 201 %)", ref _draft.Multiplier);
         NumberRow("Dosah scanneru (1–20 m)", ref _draft.Distance);
         KeyRow("Tlačítko scanneru", _draft.ScannerKey, 1);
         GUILayout.Space(8);
@@ -211,8 +210,7 @@ public sealed partial class Plugin
         _draft = new MenuDraft {
             Enabled = _enabled.Value, Scanner = _scannerEnabled.Value, RequireScanner = _requirePricingTool.Value,
             Checkout = _checkoutEnabled.Value, Hold = _holdToScan.Value, Debug = _debugLogging.Value, FixColliders = _fixCheckoutColliders.Value,
-            Multiplier = NumberText(_multiplier.Value), Rounding = NumberText(_roundDownStep.Value),
-            Distance = NumberText(_maxDistance.Value), Interval = NumberText(_scanInterval.Value),
+            Multiplier = NumberText(_multiplier.Value), Distance = NumberText(_maxDistance.Value), Interval = NumberText(_scanInterval.Value),
             PickupDelay = NumberText(_afterPickupDelay.Value), ConfirmDelay = NumberText(_confirmDelay.Value),
             ScannerKey = _hotkey.Value, CheckoutKey = _checkoutHotkey.Value
         };
@@ -223,7 +221,6 @@ public sealed partial class Plugin
         if (_draft == null)
             return;
         if (!MenuSettings.TryNumber(_draft.Multiplier, 0f, 100f, out var multiplier) ||
-            !MenuSettings.TryNumber(_draft.Rounding, 0f, 100f, out var rounding) ||
             !MenuSettings.TryNumber(_draft.Distance, 1f, 20f, out var distance) ||
             !MenuSettings.TryNumber(_draft.Interval, 0.05f, 2f, out var interval) ||
             !MenuSettings.TryNumber(_draft.PickupDelay, 0f, 60f, out var pickup) ||
@@ -244,7 +241,6 @@ public sealed partial class Plugin
             _holdToScan.Value = _draft.Hold;
             _debugLogging.Value = _draft.Debug;
             _multiplier.Value = multiplier;
-            _roundDownStep.Value = rounding;
             _maxDistance.Value = distance;
             _scanInterval.Value = interval;
             _afterPickupDelay.Value = pickup;
@@ -273,8 +269,7 @@ public sealed partial class Plugin
             Config.Reload();
             _scanInterval.Value = Mathf.Clamp(_scanInterval.Value, 0.05f, 2f);
             _maxDistance.Value = Mathf.Clamp(_maxDistance.Value, 1f, 20f);
-            _multiplier.Value = float.IsNaN(_multiplier.Value) || float.IsInfinity(_multiplier.Value) ? 2f : Mathf.Clamp(_multiplier.Value, 0f, 100f);
-            _roundDownStep.Value = float.IsNaN(_roundDownStep.Value) || float.IsInfinity(_roundDownStep.Value) ? 0.01f : Mathf.Clamp(_roundDownStep.Value, 0f, 100f);
+            _multiplier.Value = float.IsNaN(_multiplier.Value) || float.IsInfinity(_multiplier.Value) ? 2.01f : Mathf.Clamp(_multiplier.Value, 0f, 100f);
             _afterPickupDelay.Value = CheckoutDelay.Normalize(_afterPickupDelay.Value);
             _confirmDelay.Value = CheckoutDelay.Normalize(_confirmDelay.Value);
             ReadMenuDraft();
