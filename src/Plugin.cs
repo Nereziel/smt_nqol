@@ -16,13 +16,12 @@ namespace SMT.PriceGun200;
 public sealed partial class Plugin : BaseUnityPlugin
 {
     public const string PluginGuid = "cz.milan.supermarkettogether.pricegun200";
-    public const string PluginName = "SMT Price Gun 200%";
-    public const string PluginVersion = "0.7.2";
+    public const string PluginName = "SMT NQOL";
+    public const string PluginVersion = "0.7.3";
 
     private ConfigEntry<bool> _enabled = null!;
     private ConfigEntry<bool> _scannerEnabled = null!;
     private ConfigEntry<float> _multiplier = null!;
-    private ConfigEntry<float> _roundDownStep = null!;
     private ConfigEntry<float> _maxDistance = null!;
     private ConfigEntry<KeyboardShortcut> _hotkey = null!;
     private ConfigEntry<bool> _requirePricingTool = null!;
@@ -48,11 +47,8 @@ public sealed partial class Plugin : BaseUnityPlugin
 
         _scannerEnabled = Config.Bind("Scanner", "Enabled", true, "Enable scanner shelf pricing independently of checkout automation.");
 
-        _multiplier = Config.Bind("Pricing", "MarketPriceMultiplier", 2.00f,
-            "Selling price multiplier relative to the raw current market price. 2.00 = 200%.");
-
-        _roundDownStep = Config.Bind("Pricing", "RoundDownStep", 0.01f,
-            "Round DOWN to this step after multiplying. 0.01 = cents, 0.05 = five cents, 0 disables rounding.");
+        _multiplier = Config.Bind("Pricing", "MarketPriceMultiplier", 2.01f,
+            "Selling price multiplier relative to the raw current market price. 2.01 = 201%.");
 
         _maxDistance = Config.Bind("Scanner", "MaxDistance", 6.0f,
             "Maximum raycast distance used to detect the product you are aiming at.");
@@ -89,7 +85,6 @@ public sealed partial class Plugin : BaseUnityPlugin
             () => _afterPickupDelay.Value, () => _confirmDelay.Value);
         _checkoutHold = new CheckoutHoldController(_checkout, Logger);
         _multiplier.Value = Mathf.Max(0f, _multiplier.Value);
-        _roundDownStep.Value = Mathf.Max(0f, _roundDownStep.Value);
         _maxDistance.Value = Mathf.Clamp(_maxDistance.Value, 1f, 20f);
 
         _bridge = new GameBridge(Logger, () => _debugLogging.Value);
@@ -184,8 +179,7 @@ public sealed partial class Plugin : BaseUnityPlugin
         }
 
         var multiplier = Mathf.Max(0f, _multiplier.Value);
-        var targetPrice = marketPrice * multiplier;
-        targetPrice = RoundDown(targetPrice, _roundDownStep.Value);
+        var targetPrice = NormalizePrice(marketPrice * multiplier);
 
         if (targetPrice <= 0f)
         {
@@ -202,13 +196,9 @@ public sealed partial class Plugin : BaseUnityPlugin
         Logger.LogInfo($"Price update requested: product #{productId}, market {marketPrice:0.00} -> {targetPrice:0.00} ({multiplier * 100f:0.##}%).");
     }
 
-    private static float RoundDown(float value, float step)
+    private static float NormalizePrice(float value)
     {
-        if (step <= 0f)
-            return value;
-
-        // Small epsilon only protects against values such as 9.459999 becoming one step too low.
-        return (float)(Math.Floor((value + 0.000001d) / step) * step);
+        return (float)Math.Round(value, 2, MidpointRounding.AwayFromZero);
     }
 
     private Camera? FindPlayerCamera()
@@ -216,8 +206,12 @@ public sealed partial class Plugin : BaseUnityPlugin
         if (Camera.main != null && Camera.main.isActiveAndEnabled)
             return Camera.main;
 
-        return UnityEngine.Object.FindObjectsOfType<Camera>(true)
-            .FirstOrDefault(c => c.isActiveAndEnabled && c.gameObject.activeInHierarchy);
+        foreach (var camera in UnityEngine.Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (camera != null && camera.isActiveAndEnabled && camera.gameObject.activeInHierarchy)
+                return camera;
+        }
+        return null;
     }
 
     private void WarnOnce(string key, string message)
@@ -541,8 +535,15 @@ internal sealed class GameBridge
             if (TryGetStaticMemberValue(_productListingType, "Instance", out var singleton) && IsLiveProductListing(singleton))
                 current = singleton;
             else if (typeof(UnityEngine.Object).IsAssignableFrom(_productListingType))
-                current = UnityEngine.Object.FindObjectsOfType(_productListingType)
-                    .FirstOrDefault(candidate => IsLiveProductListing(candidate));
+            {
+                foreach (var candidate in UnityEngine.Object.FindObjectsByType(_productListingType, FindObjectsInactive.Include, FindObjectsSortMode.None))
+                {
+                    if (!IsLiveProductListing(candidate))
+                        continue;
+                    current = candidate;
+                    break;
+                }
+            }
         }
         if (!ReferenceEquals(_productListingInstance, current))
         {
