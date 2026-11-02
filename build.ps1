@@ -6,10 +6,11 @@ if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
 
 Push-Location $PSScriptRoot
 try {
-    dotnet restore
-    dotnet build -c Release --no-restore
+    $project = Join-Path $PSScriptRoot 'SMT.NQOL.csproj'
+    dotnet restore $project
+    dotnet build $project -c Release --no-restore
 
-    $dll = Join-Path $PSScriptRoot 'bin\Release\netstandard2.1\SMT.PriceGun200.dll'
+    $dll = Join-Path $PSScriptRoot 'bin\Release\netstandard2.1\SMT.NQOL.dll'
     if (-not (Test-Path $dll)) {
         throw "Build finished but DLL was not found at: $dll"
     }
