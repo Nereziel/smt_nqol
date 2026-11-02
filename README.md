@@ -16,16 +16,18 @@ Aim at a shelf product or label with the pricing scanner and press the configure
 Default behavior:
 
 - Hotkey: **middle mouse button** (`Mouse2`)
-- Multiplier: **2.00x / 200%** of the current market price
-- Rounding: **down to the nearest cent**
+- Multiplier: **2.01x / 201%** of the current market price
 - Pricing scanner required by default
+- Final outgoing price is normalized to two decimal places to avoid floating-point noise
 - Uses the game's normal product-price update path instead of directly editing a local price field
 
 Default calculation:
 
 ```text
-sellingPrice = floor((rawMarketPrice * 2.00) / 0.01) * 0.01
+sellingPrice = round(rawMarketPrice * 2.01, 2)
 ```
+
+The old configurable `RoundDownStep` setting was removed. Currency-style cent normalization is always applied internally; there is no separate rounding control anymore.
 
 Example configuration:
 
@@ -37,8 +39,7 @@ MaxDistance = 6
 RequirePricingTool = true
 
 [Pricing]
-MarketPriceMultiplier = 2
-RoundDownStep = 0.01
+MarketPriceMultiplier = 2.01
 ```
 
 `RequirePricingTool = true` checks the local player's equipped item and only allows the action while the pricing scanner is equipped.
@@ -77,7 +78,7 @@ FixNegativeColliders = true
 
 Press **F12** to open the settings window.
 
-The menu includes the master toggle, Price Gun settings, checkout settings, hotkeys, price multiplier, rounding, distances, payment delays, collider repair and verbose logging.
+The menu includes the master toggle, Price Gun settings, checkout settings, hotkeys, price multiplier, distances, payment delays, collider repair and verbose logging.
 
 Press **Esc** to close the menu or cancel key capture. Unapplied draft changes are discarded when the menu closes.
 
@@ -103,7 +104,7 @@ The existing plugin GUID is intentionally retained so current installations keep
 BepInEx\config\cz.milan.supermarkettogether.pricegun200.cfg
 ```
 
-This avoids resetting existing key bindings and settings during the repository/project rename.
+This avoids resetting existing key bindings and settings during the repository/project rename. Existing installations that already saved `MarketPriceMultiplier = 2` will keep that explicit value; `2.01` is the default for fresh/missing settings and can also be selected from the F12 menu.
 
 ## Multiplayer
 
@@ -151,7 +152,7 @@ Runtime integration uses reflection and defensive resolution so the mod can tole
 └─ README.md
 ```
 
-The source files keep the existing `SMT.PriceGun200` namespace and plugin GUID for compatibility; the project and release artifact use the broader `SMT.NQOL` name.
+The source files keep the existing `SMT.PriceGun200` namespace and plugin GUID for configuration compatibility; the project, plugin display name and release artifact use the broader `SMT.NQOL` name.
 
 ## Building
 
@@ -184,6 +185,8 @@ bin\Release\netstandard2.1\SMT.NQOL.dll
 The repository includes PowerShell source-level regression harnesses for the parts that can be validated without launching the game:
 
 ```powershell
+pwsh -File src/Tests/pricing.ps1
+pwsh -File src/Tests/optimization.ps1
 pwsh -File src/Tests/verify.ps1
 pwsh -File src/Tests/reconnect.ps1
 pwsh -File src/Tests/context.ps1
@@ -191,7 +194,7 @@ pwsh -File src/Tests/shelf-live.ps1
 pwsh -File src/Tests/colliders.ps1
 ```
 
-These cover pricing selection, scanner gating, shelf row resolution, checkout controls and amounts, scan serialization, payment delays, reconnect/session replacement, cached game context behavior and checkout collider geometry/lifecycle.
+These cover default pricing and cent normalization, reviewed hot paths, pricing selection, scanner gating, shelf row resolution, checkout controls and amounts, scan serialization, payment delays, reconnect/session replacement, cached game context behavior and checkout collider geometry/lifecycle.
 
 They do not replace live-game testing for rendering, network timing, changed game prefabs or newly changed game internals.
 
@@ -206,7 +209,7 @@ They do not replace live-game testing for rendering, network timing, changed gam
 Push a version tag matching `v*`, for example:
 
 ```text
-v0.8.0
+v0.7.3
 ```
 
 `.github/workflows/release.yml` builds and tests the project, packages the DLL with `README.md` and `LICENSE`, and creates a GitHub Release with a ZIP attachment and generated release notes.
