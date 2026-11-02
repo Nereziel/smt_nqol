@@ -4,18 +4,18 @@ cd /d "%~dp0"
 
 where dotnet >nul 2>nul
 if errorlevel 1 (
-  echo ERROR: dotnet nebyl nalezen. Nainstaluj .NET 8 SDK nebo novejsi.
+  echo ERROR: dotnet was not found. Install .NET 8 SDK or newer.
   exit /b 1
 )
 
-dotnet restore
+dotnet restore SMT.NQOL.csproj
 if errorlevel 1 exit /b 1
 
-dotnet build -c Release --no-restore
+dotnet build SMT.NQOL.csproj -c Release --no-restore
 if errorlevel 1 exit /b 1
 
 echo.
-echo Hotovo:
-echo %CD%\bin\Release\netstandard2.1\SMT.PriceGun200.dll
+echo Built successfully:
+echo %CD%\bin\Release\netstandard2.1\SMT.NQOL.dll
 pause
 endlocal

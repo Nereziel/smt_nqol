@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore SMT.NQOL.csproj
+
+      - name: Build
+        run: dotnet build SMT.NQOL.csproj -c Release --no-restore
+
+      - name: Regression - core behavior
+        shell: pwsh
+        run: pwsh -NoProfile -File ./src/Tests/verify.ps1
+
+      - name: Regression - reconnect
+        shell: pwsh
+        run: pwsh -NoProfile -File ./src/Tests/reconnect.ps1
+
+      - name: Regression - game context
+        shell: pwsh
+        run: pwsh -NoProfile -File ./src/Tests/context.ps1
+
+      - name: Regression - live shelf selection
+        shell: pwsh
+        run: pwsh -NoProfile -File ./src/Tests/shelf-live.ps1
+
+      - name: Regression - checkout colliders
+        shell: pwsh
+        run: pwsh -NoProfile -File ./src/Tests/colliders.ps1
+
+      - name: Package release
+        shell: pwsh
+        run: |
+          $tag = '${{ github.ref_name }}'
+          $packageName = "SMT.NQOL-$tag"
+          $staging = Join-Path 'dist' $packageName
+          $zip = Join-Path 'dist' "$packageName.zip"
+
+          New-Item -ItemType Directory -Force -Path $staging | Out-Null
+          Copy-Item 'bin/Release/netstandard2.1/SMT.NQOL.dll' $staging
+          Copy-Item 'README.md' $staging
+          Copy-Item 'LICENSE' $staging
+          Compress-Archive -Path "$staging/*" -DestinationPath $zip -Force
+
+      - name: Upload packaged artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SMT.NQOL-${{ github.ref_name }}
+          path: dist/*.zip
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          generate_release_notes: true
+          fail_on_unmatched_files: true

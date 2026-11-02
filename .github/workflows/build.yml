@@ -1,0 +1,55 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore SMT.NQOL.csproj
+
+      - name: Build
+        run: dotnet build SMT.NQOL.csproj -c Release --no-restore
+
+      - name: Regression - core behavior
+        shell: pwsh
+        run: pwsh -NoProfile -File ./src/Tests/verify.ps1
+
+      - name: Regression - reconnect
+        shell: pwsh
+        run: pwsh -NoProfile -File ./src/Tests/reconnect.ps1
+
+      - name: Regression - game context
+        shell: pwsh
+        run: pwsh -NoProfile -File ./src/Tests/context.ps1
+
+      - name: Regression - live shelf selection
+        shell: pwsh
+        run: pwsh -NoProfile -File ./src/Tests/shelf-live.ps1
+
+      - name: Regression - checkout colliders
+        shell: pwsh
+        run: pwsh -NoProfile -File ./src/Tests/colliders.ps1
+
+      - name: Upload DLL
+        uses: actions/upload-artifact@v4
+        with:
+          name: SMT.NQOL
+          path: bin/Release/netstandard2.1/SMT.NQOL.dll
+          if-no-files-found: error
