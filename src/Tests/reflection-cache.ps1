@@ -22,6 +22,7 @@ namespace CleanupCacheHarness {
     internal sealed class CacheProbe {
         public int Value { get; } = 42;
         private string Hidden = "field";
+        public string TouchHidden() => Hidden;
         public int Throwing => throw new InvalidOperationException("expected");
         public static string StaticName { get; } = "static";
     }
