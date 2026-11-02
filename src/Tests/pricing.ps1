@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 $pluginPath = Join-Path $PSScriptRoot '../Plugin.cs'
-$menuPath = Join-Path $PSScriptRoot '../RuntimeMenu.cs'
+$menuPath = Join-Path $PSScriptRoot '../UI/RuntimeMenu.cs'
 $pluginSource = Get-Content $pluginPath -Raw
 $menuSource = Get-Content $menuPath -Raw
 
