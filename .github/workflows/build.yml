@@ -20,7 +20,6 @@ jobs:
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 8.0.x
-          skip-lts-prepass: true
 
       - name: Restore
         run: dotnet restore SMT.NQOL.csproj
