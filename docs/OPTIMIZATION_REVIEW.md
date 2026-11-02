@@ -43,7 +43,7 @@ This removes obsolete API warnings and avoids Unity's unnecessary instance-ID so
 
 ### CI actions
 
-Build/release workflows were updated to current Node-24-era action majors and the unnecessary setup-dotnet LTS runtime pre-pass was disabled.
+Build/release workflows were updated to current Node-24-era action majors. The action versions used by CI still perform their normal setup behavior; no unsupported setup-dotnet inputs are used.
 
 Regression coverage now includes dedicated checks for:
 
