@@ -31,6 +31,10 @@ jobs:
         shell: pwsh
         run: pwsh -NoProfile -File ./src/Tests/pricing.ps1
 
+      - name: Regression - hot paths
+        shell: pwsh
+        run: pwsh -NoProfile -File ./src/Tests/optimization.ps1
+
       - name: Regression - core behavior
         shell: pwsh
         run: pwsh -NoProfile -File ./src/Tests/verify.ps1
