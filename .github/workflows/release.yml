@@ -16,12 +16,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 8.0.x
+          skip-lts-prepass: true
 
       - name: Determine release tag
         shell: pwsh
@@ -81,7 +82,7 @@ jobs:
           Compress-Archive -Path "$staging/*" -DestinationPath $zip -Force
 
       - name: Upload packaged artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: SMT.NQOL-${{ env.RELEASE_TAG }}
           path: dist/*.zip
