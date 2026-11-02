@@ -54,6 +54,7 @@ Default behavior:
 - Short press: accept/complete the currently aimed cash or card payment
 - Hold for about **0.3 seconds** while aiming at a checkout or belt product: scan products one at a time and continue into payment handling
 - Waits for the server/game state before submitting the next belt item
+- Caches belt products for the active register and throttles scene-wide fallback discovery
 - Supports exact cash change and card total entry
 - Respects cashier permission checks
 - Stops local automation when the key is released, focus/context is lost, the player changes, or the register is no longer valid
@@ -116,35 +117,48 @@ Checkout automation also uses the normal interaction/state paths and requires ca
 
 Game updates can change internal Unity/PlayMaker objects, so live-game validation may occasionally be required even when the project and regression harnesses still pass.
 
-## Compatibility approach
+## Compatibility and performance approach
 
 The project intentionally does **not** compile directly against `Assembly-CSharp.dll`.
 
-Runtime integration uses reflection and defensive resolution so the mod can tolerate some internal game changes. Among other things it:
+Runtime integration uses reflection and defensive resolution so the mod can tolerate some internal game changes. Version 0.7.4 also reduces repeated runtime discovery without caching live game values incorrectly:
 
-- resolves the current live local player/session objects instead of permanently caching stale network instances;
-- resolves shelf rows from live `productInfoArray` data;
-- supports product identifiers represented by integers or enums;
-- prefers the game's own product-price update methods;
-- validates checkout controls and transaction state before submitting actions;
-- rate-limits and caches expensive runtime discovery where appropriate.
+- reflected fields/properties are resolved once per runtime type/member name, while their values are still read live;
+- successful type resolution is cached and missing types are retried after five seconds or immediately when the loaded assembly count changes;
+- the current live player/session objects are rebound instead of permanently caching stale network instances;
+- shelf rows are resolved from live `productInfoArray` data;
+- held checkout keeps a register-scoped product cache and performs scene-wide discovery only as a throttled fallback;
+- checkout controls and transaction state are validated before submitting actions;
+- product-price updates still go through the game's own update method where possible.
 
 ## Project structure
 
 ```text
 .
 ├─ .github/workflows/
-│  ├─ build.yml             # CI build + regression checks
-│  └─ release.yml           # tag build + GitHub Release ZIP
+│  ├─ build.yml
+│  └─ release.yml
 ├─ src/
-│  ├─ Plugin.cs             # BepInEx entry point and Price Gun runtime bridge
-│  ├─ PricingToolSelection.cs
-│  ├─ ShelfProductSelection.cs
-│  ├─ Checkout*.cs          # automated checkout implementation
-│  ├─ GameContext.cs        # shared live game/player context
-│  ├─ MenuSettings.cs       # settings validation helpers
-│  ├─ RuntimeMenu.cs        # F12 settings UI
-│  └─ Tests/                # source-level regression harnesses
+│  ├─ Plugin.cs
+│  ├─ Core/
+│  │  ├─ GameBridge.cs
+│  │  ├─ GameContext.cs
+│  │  ├─ ReflectionMemberCache.cs
+│  │  └─ TypeMissCache.cs
+│  ├─ Features/
+│  │  ├─ PriceGun/
+│  │  │  ├─ PricingToolSelection.cs
+│  │  │  └─ ShelfProductSelection.cs
+│  │  └─ Checkout/
+│  │     ├─ CheckoutBridge.cs
+│  │     ├─ CheckoutHoldController.cs
+│  │     ├─ CheckoutDiscoveryThrottle.cs
+│  │     └─ Checkout*.cs
+│  ├─ UI/
+│  │  ├─ MenuSettings.cs
+│  │  └─ RuntimeMenu.cs
+│  └─ Tests/
+├─ docs/
 ├─ SMT.NQOL.csproj
 ├─ build.ps1
 ├─ build.cmd
@@ -180,6 +194,8 @@ Output:
 bin\Release\netstandard2.1\SMT.NQOL.dll
 ```
 
+The BepInEx dependency is pinned to the tested `5.4.21` package version so restores remain reproducible.
+
 ## Regression checks
 
 The repository includes PowerShell source-level regression harnesses for the parts that can be validated without launching the game:
@@ -187,6 +203,9 @@ The repository includes PowerShell source-level regression harnesses for the par
 ```powershell
 pwsh -File src/Tests/pricing.ps1
 pwsh -File src/Tests/optimization.ps1
+pwsh -File src/Tests/reflection-cache.ps1
+pwsh -File src/Tests/checkout-cache.ps1
+pwsh -File src/Tests/structure.ps1
 pwsh -File src/Tests/verify.ps1
 pwsh -File src/Tests/reconnect.ps1
 pwsh -File src/Tests/context.ps1
@@ -194,7 +213,7 @@ pwsh -File src/Tests/shelf-live.ps1
 pwsh -File src/Tests/colliders.ps1
 ```
 
-These cover default pricing and cent normalization, reviewed hot paths, pricing selection, scanner gating, shelf row resolution, checkout controls and amounts, scan serialization, payment delays, reconnect/session replacement, cached game context behavior and checkout collider geometry/lifecycle.
+These cover pricing and cent normalization, reflection/type caching, checkout discovery throttling, source cleanup, scanner/shelf behavior, checkout state and amounts, reconnect/session replacement, cached game context behavior and checkout collider lifecycle.
 
 They do not replace live-game testing for rendering, network timing, changed game prefabs or newly changed game internals.
 
@@ -202,14 +221,14 @@ They do not replace live-game testing for rendering, network timing, changed gam
 
 ### Build
 
-`.github/workflows/build.yml` runs on pushes, pull requests and manual dispatch. It restores dependencies, builds the Release configuration, runs all regression harnesses and uploads `SMT.NQOL.dll` as an artifact.
+`.github/workflows/build.yml` runs for pull requests, pushes to `main`, and manual dispatch. It restores dependencies, builds Release, runs all regression harnesses and uploads `SMT.NQOL.dll` as an artifact. Feature branches use the pull-request run so the same commit is not built twice after a PR is open.
 
 ### Release
 
 Push a version tag matching `v*`, for example:
 
 ```text
-v0.7.3
+v0.7.4
 ```
 
 `.github/workflows/release.yml` builds and tests the project, packages the DLL with `README.md` and `LICENSE`, and creates a GitHub Release with a ZIP attachment and generated release notes.

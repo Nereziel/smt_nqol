@@ -42,10 +42,7 @@ internal sealed class CheckoutBridge
     internal void RefreshPending()
     {
         if (_pendingCheckout == null)
-        {
-            CancelPending();
             return;
-        }
         if (Time.unscaledTime < _nextPendingCheck)
             return;
         _nextPendingCheck = Time.unscaledTime + 0.05f;
@@ -144,9 +141,7 @@ internal sealed class CheckoutBridge
             Math.Abs((double)total - _preparedTotal) > 0.005d)
         {
             Debug("Prepared checkout confirmation cancelled: context changed or validation timed out.");
-            _guard.Observe(0, 0, false);
-            _preparedConfirm = null;
-            _pendingCheckout = null;
+            CancelPending();
             return;
         }
         if (!IsActive(checkout.transform, _preparedCash ? "CashRegisterCanvas/Container" : "CreditCardCanvas/Container"))
@@ -181,8 +176,7 @@ internal sealed class CheckoutBridge
         }
         catch
         {
-            _pendingCheckout = null;
-            _guard.Observe(0, 0, false);
+            CancelPending();
             throw;
         }
         _log.LogInfo($"Checkout {(_preparedCash ? "cash change" : "card amount")} confirmation sent: total {_preparedTotal:0.00}.");

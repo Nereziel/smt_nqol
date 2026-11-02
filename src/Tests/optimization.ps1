@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 $pluginSource = Get-Content (Join-Path $PSScriptRoot '../Plugin.cs') -Raw
-$holdSource = Get-Content (Join-Path $PSScriptRoot '../CheckoutHoldController.cs') -Raw
+$holdSource = Get-Content (Join-Path $PSScriptRoot '../Features/Checkout/CheckoutHoldController.cs') -Raw
 
 if ($pluginSource -match 'FindObjectsOfType<Camera>') {
     throw 'Camera fallback must use the non-obsolete FindObjectsByType API.'

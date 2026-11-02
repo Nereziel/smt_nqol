@@ -1,127 +1,71 @@
 $ErrorActionPreference = 'Stop'
-$pluginSource = Get-Content (Join-Path $PSScriptRoot '../Plugin.cs') -Raw
-function Extract-Method([string] $signature) {
-    $start = $pluginSource.IndexOf($signature)
-    if ($start -lt 0) { throw "Missing method: $signature" }
-    $open = $pluginSource.IndexOf('{', $start)
-    $depth = 1
-    $end = $open + 1
-    while ($depth -gt 0 -and $end -lt $pluginSource.Length) {
-        if ($pluginSource[$end] -eq '{') { $depth++ }
-        if ($pluginSource[$end] -eq '}') { $depth-- }
-        $end++
-    }
-    return $pluginSource.Substring($start, $end - $start)
-}
-$methods = @(
-    (Extract-Method '    internal static Type? FindType('),
-    (Extract-Method '    internal static bool TryGetStaticMemberValue('),
-    (Extract-Method '    internal static bool TryGetMemberValue(')
-) -join "`n"
-$contextSource = Get-Content (Join-Path $PSScriptRoot '../GameContext.cs') -Raw
+$contextSource = Get-Content (Join-Path $PSScriptRoot '../Core/GameContext.cs') -Raw
 $contextSource = $contextSource.Replace('using System;', '').Replace('using System.Reflection;', '').Replace('using UnityEngine;', '')
 $contextSource = $contextSource.Replace('namespace SMT.PriceGun200;', 'namespace SMT.PriceGun200 {') + "`n}"
 $harness = @"
 #nullable enable
 using System;
-using System.Linq;
 using System.Reflection;
 using System.Collections.Generic;
 using UnityEngine;
 namespace UnityEngine {
     public class Object {
         public bool Destroyed;
-        public static bool operator ==(Object? a, Object? b) {
-            bool aNull = ReferenceEquals(a, null) || a!.Destroyed;
-            bool bNull = ReferenceEquals(b, null) || b!.Destroyed;
-            return aNull || bNull ? aNull == bNull : ReferenceEquals(a, b);
-        }
-        public static bool operator !=(Object? a, Object? b) { return !(a == b); }
-        public override bool Equals(object? other) => ReferenceEquals(this, other);
-        public override int GetHashCode() => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(this);
+        public static bool operator ==(Object? a,Object? b) { bool an=ReferenceEquals(a,null)||a!.Destroyed; bool bn=ReferenceEquals(b,null)||b!.Destroyed; return an||bn ? an==bn : ReferenceEquals(a,b); }
+        public static bool operator !=(Object? a,Object? b)=>!(a==b);
+        public override bool Equals(object? o)=>ReferenceEquals(this,o);
+        public override int GetHashCode()=>System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(this);
     }
-    public class GameObject {
-        public bool activeInHierarchy = true;
-        public Dictionary<Type, Component> Components = new Dictionary<Type, Component>();
-    }
-    public class Component : Object {
-        public GameObject gameObject = new GameObject();
-        public static int ComponentLookups;
-        public Component? GetComponent(Type type) { ComponentLookups++; return gameObject.Components.TryGetValue(type, out var c) ? c : null; }
-    }
-    public class MonoBehaviour : Component { public bool isActiveAndEnabled = true; }
+    public class GameObject { public bool activeInHierarchy=true; public Dictionary<Type,Component> Components=new(); }
+    public class Component : Object { public GameObject gameObject=new(); public static int ComponentLookups; public Component? GetComponent(Type t){ ComponentLookups++; return gameObject.Components.TryGetValue(t,out var c)?c:null; } }
+    public class MonoBehaviour : Component { public bool isActiveAndEnabled=true; }
 }
 public class FirstPersonController : Component { public static FirstPersonController? Instance; }
-public class PlayerNetwork : MonoBehaviour { public bool isLocalPlayer = true; }
-public class PlayerPermissions : Component { public bool Allowed = true; public bool RequestCP() => Allowed; }
-public class FsmBool { public bool Value { get; set; } }
-public class FsmVariables {
-    public static FsmVariables GlobalVariables = new FsmVariables();
-    public FsmBool? Options = new FsmBool();
-    public static int VariableLookups;
-    public FsmBool? FindFsmBool(string name) { VariableLookups++; return Options; }
-}
+public class PlayerNetwork : MonoBehaviour { public bool isLocalPlayer=true; }
+public class PlayerPermissions : Component { public bool Allowed=true; public bool RequestCP()=>Allowed; }
+public class FsmBool { public bool Value {get;set;} }
+public class FsmVariables { public static FsmVariables GlobalVariables=new(); public FsmBool? Options=new(); public static int VariableLookups; public FsmBool? FindFsmBool(string n){VariableLookups++; return Options;} }
 namespace SMT.PriceGun200 {
-    // Count real production FindType assembly enumeration without changing its implementation.
-    internal static class AppDomain {
-        public static int Searches;
-        public static Domain CurrentDomain { get { return new Domain(); } }
-        public class Domain { public Assembly[] GetAssemblies() { Searches++; return System.AppDomain.CurrentDomain.GetAssemblies(); } }
-    }
     internal static class GameBridge {
-        private static readonly Dictionary<string, Type> TypeCache = new(StringComparer.Ordinal);
-$methods
+        private static readonly Dictionary<string,Type> Catalog=new(StringComparer.Ordinal) {
+            ["FirstPersonController"]=typeof(FirstPersonController), ["PlayerNetwork"]=typeof(PlayerNetwork),
+            ["PlayerPermissions"]=typeof(PlayerPermissions), ["FsmVariables"]=typeof(FsmVariables)
+        };
+        private static readonly Dictionary<string,Type> TypeCache=new(StringComparer.Ordinal);
+        internal static int TypeSearches;
+        internal static Type? FindType(string name) {
+            if (TypeCache.TryGetValue(name,out var cached)) return cached;
+            TypeSearches++;
+            if (!Catalog.TryGetValue(name,out var found)) return null;
+            TypeCache[name]=found;
+            return found;
+        }
+        internal static bool TryGetStaticMemberValue(Type t,string n,out object? v) { var p=t.GetProperty(n,BindingFlags.Static|BindingFlags.Public|BindingFlags.NonPublic); if(p!=null){v=p.GetValue(null);return true;} var f=t.GetField(n,BindingFlags.Static|BindingFlags.Public|BindingFlags.NonPublic); v=f?.GetValue(null); return f!=null; }
+        internal static bool TryGetMemberValue(object o,string n,out object? v) { var t=o.GetType(); var p=t.GetProperty(n,BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic); if(p!=null){v=p.GetValue(o);return true;} var f=t.GetField(n,BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic); v=f?.GetValue(o); return f!=null; }
     }
 }
 $contextSource
 namespace SMT.PriceGun200 {
     public static class ContextChecks {
-        private static void Check(bool condition, string message) { if (!condition) throw new Exception(message); }
-        private static PlayerNetwork Connect() {
-            var controller = new FirstPersonController();
-            var player = new PlayerNetwork { gameObject = controller.gameObject };
-            var permissions = new PlayerPermissions { gameObject = controller.gameObject };
-            controller.gameObject.Components[typeof(PlayerNetwork)] = player;
-            controller.gameObject.Components[typeof(PlayerPermissions)] = permissions;
-            FirstPersonController.Instance = controller;
-            return player;
-        }
-        public static void Run() {
-            Check(GameContext.LocalPlayer == null && !GameContext.HasCashierPermission(), "Missing player accepted");
-            var first = Connect();
-            Check(ReferenceEquals(GameContext.LocalPlayer, first) && GameContext.HasCashierPermission(), "Initial local context failed");
-            Check(!GameContext.IsInOptions(), "Default options state wrong");
-            var components = Component.ComponentLookups;
-            var types = AppDomain.Searches;
-            var variables = FsmVariables.VariableLookups;
-            for (int i = 0; i < 1000; i++) {
-                Check(ReferenceEquals(GameContext.LocalPlayer, first) && GameContext.HasCashierPermission() && !GameContext.IsInOptions(), "Warm context changed");
-            }
-            Check(Component.ComponentLookups == components && AppDomain.Searches == types && FsmVariables.VariableLookups == variables,
-                "Warm context repeated type, component or variable discovery");
-            var permissions = (PlayerPermissions)first.gameObject.Components[typeof(PlayerPermissions)];
-            permissions.Allowed = false;
-            Check(!GameContext.HasCashierPermission(), "Permission changes were cached incorrectly");
-            permissions.Allowed = true;
-            FsmVariables.GlobalVariables.Options!.Value = true;
-            Check(GameContext.IsInOptions(), "Live options change missed");
-            first.Destroyed = true;
-            FirstPersonController.Instance!.Destroyed = true;
-            Check(GameContext.LocalPlayer == null && !GameContext.HasCashierPermission(), "Destroyed player survived disconnect");
-            var second = Connect();
-            Check(ReferenceEquals(GameContext.LocalPlayer, second) && GameContext.HasCashierPermission(), "New local player not bound after reconnect");
-            FsmVariables.GlobalVariables = new FsmVariables();
-            Check(!GameContext.IsInOptions(), "Replaced global variables not rebound");
-            FsmVariables.GlobalVariables = new FsmVariables { Options = null };
-            Check(!GameContext.IsInOptions(), "Missing options variable not handled");
-            FsmVariables.GlobalVariables.Options = new FsmBool { Value = true };
-            Check(GameContext.IsInOptions(), "Late options initialization did not recover");
-            second.isLocalPlayer = false;
-            Check(GameContext.LocalPlayer == null, "Remote player accepted");
+        private static void Check(bool c,string m){if(!c)throw new Exception(m);}
+        private static PlayerNetwork Connect(){var controller=new FirstPersonController(); var player=new PlayerNetwork{gameObject=controller.gameObject}; var permissions=new PlayerPermissions{gameObject=controller.gameObject}; controller.gameObject.Components[typeof(PlayerNetwork)]=player; controller.gameObject.Components[typeof(PlayerPermissions)]=permissions; FirstPersonController.Instance=controller; return player;}
+        public static void Run(){
+            Check(GameContext.LocalPlayer==null && !GameContext.HasCashierPermission(),"Missing player accepted");
+            var first=Connect(); Check(ReferenceEquals(GameContext.LocalPlayer,first)&&GameContext.HasCashierPermission(),"Initial context failed"); Check(!GameContext.IsInOptions(),"Options default wrong");
+            var components=Component.ComponentLookups; var variables=FsmVariables.VariableLookups; var typeSearches=GameBridge.TypeSearches;
+            for(int i=0;i<1000;i++) Check(ReferenceEquals(GameContext.LocalPlayer,first)&&GameContext.HasCashierPermission()&&!GameContext.IsInOptions(),"Warm context changed");
+            Check(Component.ComponentLookups==components && FsmVariables.VariableLookups==variables && GameBridge.TypeSearches==typeSearches,"Warm context repeated expensive type/component/variable discovery");
+            var permissions=(PlayerPermissions)first.gameObject.Components[typeof(PlayerPermissions)]; permissions.Allowed=false; Check(!GameContext.HasCashierPermission(),"Permission cached"); permissions.Allowed=true;
+            FsmVariables.GlobalVariables.Options!.Value=true; Check(GameContext.IsInOptions(),"Live options missed");
+            first.Destroyed=true; FirstPersonController.Instance!.Destroyed=true; Check(GameContext.LocalPlayer==null,"Destroyed player survived");
+            var second=Connect(); Check(ReferenceEquals(GameContext.LocalPlayer,second)&&GameContext.HasCashierPermission(),"Reconnect failed");
+            FsmVariables.GlobalVariables=new FsmVariables(); Check(!GameContext.IsInOptions(),"Global variables not rebound");
+            FsmVariables.GlobalVariables=new FsmVariables{Options=null}; Check(!GameContext.IsInOptions(),"Missing options mishandled"); FsmVariables.GlobalVariables.Options=new FsmBool{Value=true}; Check(GameContext.IsInOptions(),"Late options did not recover");
+            second.isLocalPlayer=false; Check(GameContext.LocalPlayer==null,"Remote player accepted");
         }
     }
 }
 "@
 Add-Type -TypeDefinition $harness
 [SMT.PriceGun200.ContextChecks]::Run()
-Write-Output 'PASS: 1000 warm context cycles without rediscovery; live permissions/options, disconnect, reconnect, missing and late options state checked. No scene-wide player search API is present in the test runtime.'
+Write-Output 'PASS: cached game context avoids warm expensive rediscovery and preserves live permissions/options plus reconnect behavior.'

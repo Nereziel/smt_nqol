@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using BepInEx.Logging;
 using UnityEngine;
 
@@ -9,10 +10,13 @@ internal sealed class CheckoutHoldController
     private readonly CheckoutBridge _checkout;
     private readonly ManualLogSource _log;
     private readonly CheckoutScanGate _scanGate = new();
+    private readonly List<Component> _productCache = new();
+    private readonly CheckoutDiscoveryThrottle _discoveryThrottle = new();
     private Component? _register;
     private MonoBehaviour? _player;
     private Component? _pendingItem;
     private Type? _productType;
+    private GameObject? _productCacheRegister;
     private bool _held;
     private bool _automating;
     private bool _blocked;
@@ -43,6 +47,7 @@ internal sealed class CheckoutHoldController
             _register = _checkout.FindHoldCheckout();
             _player = FindLocalPlayer();
             _blocked = _register == null || _player == null;
+            ResetProductCache();
         }
         if (_blocked || _register == null || _player == null)
             return false;
@@ -71,26 +76,16 @@ internal sealed class CheckoutHoldController
         }
         if (_checkout.HasPendingPayment(_register))
             return true;
-        _productType ??= GameBridge.FindType("ProductCheckoutSpawn");
-        if (_productType == null)
-            return true;
 
-        Component? product = null;
-        var nearestDistance = float.PositiveInfinity;
         var registerObject = _register.gameObject;
-        var registerPosition = _register.transform.position;
-        foreach (var found in UnityEngine.Object.FindObjectsByType(_productType, FindObjectsInactive.Exclude, FindObjectsSortMode.None))
-        {
-            if (found is not Component item || item == null || !ReadBool(item, "isClient") || !ReadBool(item, "isFinished") ||
-                !GameBridge.TryGetMemberValue(item, "netId", out var netId) || netId is not uint id || id == 0 ||
-                !GameBridge.TryGetMemberValue(item, "NetworkcheckoutOBJ", out var owner) || owner is not GameObject register || register != registerObject)
-                continue;
+        if (_productCacheRegister != registerObject)
+            ResetProductCache();
 
-            var distance = (item.transform.position - registerPosition).sqrMagnitude;
-            if (distance >= nearestDistance)
-                continue;
-            nearestDistance = distance;
-            product = item;
+        var product = FindNearestCachedProduct(registerObject, _register.transform.position);
+        if (product == null && _discoveryThrottle.ShouldDiscover(Time.unscaledTime))
+        {
+            RefreshProductCache(registerObject);
+            product = FindNearestCachedProduct(registerObject, _register.transform.position);
         }
 
         if (product != null)
@@ -115,6 +110,50 @@ internal sealed class CheckoutHoldController
         return true;
     }
 
+    private Component? FindNearestCachedProduct(GameObject registerObject, Vector3 registerPosition)
+    {
+        Component? nearest = null;
+        var nearestDistance = float.PositiveInfinity;
+        foreach (var item in _productCache)
+        {
+            if (item == null || !ReadBool(item, "isClient") || !ReadBool(item, "isFinished") ||
+                !GameBridge.TryGetMemberValue(item, "netId", out var netId) || netId is not uint id || id == 0 ||
+                !GameBridge.TryGetMemberValue(item, "NetworkcheckoutOBJ", out var owner) || owner is not GameObject register || register != registerObject)
+                continue;
+            var distance = (item.transform.position - registerPosition).sqrMagnitude;
+            if (distance >= nearestDistance)
+                continue;
+            nearestDistance = distance;
+            nearest = item;
+        }
+        return nearest;
+    }
+
+    private void RefreshProductCache(GameObject registerObject)
+    {
+        _productCache.Clear();
+        _productCacheRegister = registerObject;
+        _productType ??= GameBridge.FindType("ProductCheckoutSpawn");
+        if (_productType == null)
+            return;
+
+        foreach (var found in UnityEngine.Object.FindObjectsByType(_productType, FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+        {
+            if (found is not Component item || item == null || !ReadBool(item, "isClient") ||
+                !GameBridge.TryGetMemberValue(item, "netId", out var netId) || netId is not uint id || id == 0 ||
+                !GameBridge.TryGetMemberValue(item, "NetworkcheckoutOBJ", out var owner) || owner is not GameObject register || register != registerObject)
+                continue;
+            _productCache.Add(item);
+        }
+    }
+
+    private void ResetProductCache()
+    {
+        _productCache.Clear();
+        _productCacheRegister = null;
+        _discoveryThrottle.Reset();
+    }
+
     internal void Stop()
     {
         if (_automating)
@@ -125,6 +164,7 @@ internal sealed class CheckoutHoldController
         _register = null;
         _player = null;
         _nextAction = 0f;
+        ResetProductCache();
         // Preserve _pendingItem and the scan gate until the server destroys that item.
     }
 
