@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>SMT.PriceGun200</AssemblyName>
+    <RootNamespace>SMT.PriceGun200</RootNamespace>
+    <Version>0.7.2</Version>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RestoreAdditionalProjectSources>
+      https://api.nuget.org/v3/index.json;
+      https://nuget.bepinex.dev/v3/index.json
+    </RestoreAdditionalProjectSources>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Tests/**/*.cs;.tools/**/*.cs" />
+    <PackageReference Include="BepInEx.Core" Version="5.*" />
+    <PackageReference Include="UnityEngine.Modules" Version="2023.1.9" IncludeAssets="compile" />
+  </ItemGroup>
+</Project>
