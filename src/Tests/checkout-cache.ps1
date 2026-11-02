@@ -12,26 +12,27 @@ $holdSource = Get-Content $holdPath -Raw
 $bridgeSource = Get-Content $bridgePath -Raw
 
 $harness = @"
-#nullable enable
-using System;
-using SMT.PriceGun200;
+namespace CleanupCheckoutHarness {
+    using System;
+    using SMT.PriceGun200;
 
-public static class CheckoutCacheChecks {
-    private static void Check(bool value, string message) { if (!value) throw new Exception(message); }
-    public static void Run() {
-        var throttle = new CheckoutDiscoveryThrottle();
-        Check(throttle.ShouldDiscover(10f), "First discovery was not immediate");
-        Check(!throttle.ShouldDiscover(10.49f), "Discovery was not throttled for 0.5 seconds");
-        Check(throttle.ShouldDiscover(10.5f), "Discovery did not reopen at 0.5 seconds");
-        Check(!throttle.ShouldDiscover(10.75f), "Second discovery window was not throttled");
-        throttle.Reset();
-        Check(throttle.ShouldDiscover(10.75f), "Reset did not allow immediate discovery");
+    public static class CheckoutCacheChecks {
+        private static void Check(bool value, string message) { if (!value) throw new Exception(message); }
+        public static void Run() {
+            var throttle = new CheckoutDiscoveryThrottle();
+            Check(throttle.ShouldDiscover(10f), "First discovery was not immediate");
+            Check(!throttle.ShouldDiscover(10.49f), "Discovery was not throttled for 0.5 seconds");
+            Check(throttle.ShouldDiscover(10.5f), "Discovery did not reopen at 0.5 seconds");
+            Check(!throttle.ShouldDiscover(10.75f), "Second discovery window was not throttled");
+            throttle.Reset();
+            Check(throttle.ShouldDiscover(10.75f), "Reset did not allow immediate discovery");
+        }
     }
 }
 "@
 
 Add-Type -TypeDefinition ("#nullable enable`n" + $throttleSource + "`n" + $harness)
-[CheckoutCacheChecks]::Run()
+[CleanupCheckoutHarness.CheckoutCacheChecks]::Run()
 
 if ($holdSource -notmatch 'List<Component>\s+_productCache') {
     throw 'Held checkout must keep a register-scoped product cache.'
