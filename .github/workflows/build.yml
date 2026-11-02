@@ -27,6 +27,10 @@ jobs:
       - name: Build
         run: dotnet build SMT.NQOL.csproj -c Release --no-restore
 
+      - name: Regression - pricing
+        shell: pwsh
+        run: pwsh -NoProfile -File ./src/Tests/pricing.ps1
+
       - name: Regression - core behavior
         shell: pwsh
         run: pwsh -NoProfile -File ./src/Tests/verify.ps1
