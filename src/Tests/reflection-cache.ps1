@@ -19,11 +19,16 @@ namespace CleanupCacheHarness {
     using System;
     using SMT.PriceGun200;
 
-    internal sealed class CacheProbe {
+    internal class CacheProbeBase {
+        public string Shadow = "field-fallback";
+    }
+
+    internal sealed class CacheProbe : CacheProbeBase {
         public int Value { get; } = 42;
         private string Hidden = "field";
         public string TouchHidden() => Hidden;
         public int Throwing => throw new InvalidOperationException("expected");
+        public new string Shadow => throw new InvalidOperationException("property intentionally unavailable");
         public static string StaticName { get; } = "static";
     }
 
@@ -38,6 +43,8 @@ namespace CleanupCacheHarness {
                 "Private field fallback failed");
             Check(!ReflectionMemberCache.TryGetInstanceValue(probe, "missing", out _), "Missing member was accepted");
             Check(!ReflectionMemberCache.TryGetInstanceValue(probe, "Throwing", out _), "Throwing getter escaped cache helper");
+            Check(ReflectionMemberCache.TryGetInstanceValue(probe, "shadow", out var shadow) && (string)shadow! == "field-fallback",
+                "Throwing property did not fall back to an inherited field as the original helper did");
             Check(ReflectionMemberCache.TryGetStaticValue(typeof(CacheProbe), "staticname", out var staticValue) && (string)staticValue! == "static",
                 "Static property lookup failed");
 
@@ -58,4 +65,4 @@ namespace CleanupCacheHarness {
 
 Add-Type -TypeDefinition ("#nullable enable`n" + $memberSource + "`n" + $typeMissSource + "`n" + $harness)
 [CleanupCacheHarness.ReflectionCacheChecks]::Run()
-Write-Output 'PASS: reflection metadata caching and five-second type-miss throttling preserve lookup behavior.'
+Write-Output 'PASS: reflection metadata caching preserves property/field fallback and five-second type-miss throttling.'
