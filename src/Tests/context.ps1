@@ -45,9 +45,9 @@ namespace SMT.PriceGun200 {
         public static void Run(){
             Check(GameContext.LocalPlayer==null && !GameContext.HasCashierPermission(),"Missing player accepted");
             var first=Connect(); Check(ReferenceEquals(GameContext.LocalPlayer,first)&&GameContext.HasCashierPermission(),"Initial context failed"); Check(!GameContext.IsInOptions(),"Options default wrong");
-            var components=Component.ComponentLookups; var variables=FsmVariables.VariableLookups;
+            var components=Component.ComponentLookups; var variables=FsmVariables.VariableLookups; var types=GameBridge.TypeLookups;
             for(int i=0;i<1000;i++) Check(ReferenceEquals(GameContext.LocalPlayer,first)&&GameContext.HasCashierPermission()&&!GameContext.IsInOptions(),"Warm context changed");
-            Check(Component.ComponentLookups==components && FsmVariables.VariableLookups==variables,"Warm context repeated component/variable discovery");
+            Check(Component.ComponentLookups==components && FsmVariables.VariableLookups==variables && GameBridge.TypeLookups==types,"Warm context repeated type/component/variable discovery");
             var permissions=(PlayerPermissions)first.gameObject.Components[typeof(PlayerPermissions)]; permissions.Allowed=false; Check(!GameContext.HasCashierPermission(),"Permission cached"); permissions.Allowed=true;
             FsmVariables.GlobalVariables.Options!.Value=true; Check(GameContext.IsInOptions(),"Live options missed");
             first.Destroyed=true; FirstPersonController.Instance!.Destroyed=true; Check(GameContext.LocalPlayer==null,"Destroyed player survived");
@@ -61,4 +61,4 @@ namespace SMT.PriceGun200 {
 "@
 Add-Type -TypeDefinition $harness
 [SMT.PriceGun200.ContextChecks]::Run()
-Write-Output 'PASS: cached game context preserves live permissions/options and reconnect behavior after Core split.'
+Write-Output 'PASS: cached game context avoids warm rediscovery and preserves live permissions/options plus reconnect behavior.'
