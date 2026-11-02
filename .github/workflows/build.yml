@@ -14,12 +14,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 8.0.x
+          skip-lts-prepass: true
 
       - name: Restore
         run: dotnet restore SMT.NQOL.csproj
@@ -56,7 +57,7 @@ jobs:
         run: pwsh -NoProfile -File ./src/Tests/colliders.ps1
 
       - name: Upload DLL
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: SMT.NQOL
           path: bin/Release/netstandard2.1/SMT.NQOL.dll
