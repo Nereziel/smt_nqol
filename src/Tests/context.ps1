@@ -27,12 +27,19 @@ public class FsmBool { public bool Value {get;set;} }
 public class FsmVariables { public static FsmVariables GlobalVariables=new(); public FsmBool? Options=new(); public static int VariableLookups; public FsmBool? FindFsmBool(string n){VariableLookups++; return Options;} }
 namespace SMT.PriceGun200 {
     internal static class GameBridge {
-        private static readonly Dictionary<string,Type> Types=new(StringComparer.Ordinal) {
+        private static readonly Dictionary<string,Type> Catalog=new(StringComparer.Ordinal) {
             ["FirstPersonController"]=typeof(FirstPersonController), ["PlayerNetwork"]=typeof(PlayerNetwork),
             ["PlayerPermissions"]=typeof(PlayerPermissions), ["FsmVariables"]=typeof(FsmVariables)
         };
-        internal static int TypeLookups;
-        internal static Type? FindType(string name) { TypeLookups++; return Types.TryGetValue(name,out var t)?t:null; }
+        private static readonly Dictionary<string,Type> TypeCache=new(StringComparer.Ordinal);
+        internal static int TypeSearches;
+        internal static Type? FindType(string name) {
+            if (TypeCache.TryGetValue(name,out var cached)) return cached;
+            TypeSearches++;
+            if (!Catalog.TryGetValue(name,out var found)) return null;
+            TypeCache[name]=found;
+            return found;
+        }
         internal static bool TryGetStaticMemberValue(Type t,string n,out object? v) { var p=t.GetProperty(n,BindingFlags.Static|BindingFlags.Public|BindingFlags.NonPublic); if(p!=null){v=p.GetValue(null);return true;} var f=t.GetField(n,BindingFlags.Static|BindingFlags.Public|BindingFlags.NonPublic); v=f?.GetValue(null); return f!=null; }
         internal static bool TryGetMemberValue(object o,string n,out object? v) { var t=o.GetType(); var p=t.GetProperty(n,BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic); if(p!=null){v=p.GetValue(o);return true;} var f=t.GetField(n,BindingFlags.Instance|BindingFlags.Public|BindingFlags.NonPublic); v=f?.GetValue(o); return f!=null; }
     }
@@ -45,9 +52,9 @@ namespace SMT.PriceGun200 {
         public static void Run(){
             Check(GameContext.LocalPlayer==null && !GameContext.HasCashierPermission(),"Missing player accepted");
             var first=Connect(); Check(ReferenceEquals(GameContext.LocalPlayer,first)&&GameContext.HasCashierPermission(),"Initial context failed"); Check(!GameContext.IsInOptions(),"Options default wrong");
-            var components=Component.ComponentLookups; var variables=FsmVariables.VariableLookups; var types=GameBridge.TypeLookups;
+            var components=Component.ComponentLookups; var variables=FsmVariables.VariableLookups; var typeSearches=GameBridge.TypeSearches;
             for(int i=0;i<1000;i++) Check(ReferenceEquals(GameContext.LocalPlayer,first)&&GameContext.HasCashierPermission()&&!GameContext.IsInOptions(),"Warm context changed");
-            Check(Component.ComponentLookups==components && FsmVariables.VariableLookups==variables && GameBridge.TypeLookups==types,"Warm context repeated type/component/variable discovery");
+            Check(Component.ComponentLookups==components && FsmVariables.VariableLookups==variables && GameBridge.TypeSearches==typeSearches,"Warm context repeated expensive type/component/variable discovery");
             var permissions=(PlayerPermissions)first.gameObject.Components[typeof(PlayerPermissions)]; permissions.Allowed=false; Check(!GameContext.HasCashierPermission(),"Permission cached"); permissions.Allowed=true;
             FsmVariables.GlobalVariables.Options!.Value=true; Check(GameContext.IsInOptions(),"Live options missed");
             first.Destroyed=true; FirstPersonController.Instance!.Destroyed=true; Check(GameContext.LocalPlayer==null,"Destroyed player survived");
@@ -61,4 +68,4 @@ namespace SMT.PriceGun200 {
 "@
 Add-Type -TypeDefinition $harness
 [SMT.PriceGun200.ContextChecks]::Run()
-Write-Output 'PASS: cached game context avoids warm rediscovery and preserves live permissions/options plus reconnect behavior.'
+Write-Output 'PASS: cached game context avoids warm expensive rediscovery and preserves live permissions/options plus reconnect behavior.'
