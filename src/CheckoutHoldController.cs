@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using BepInEx.Logging;
 using UnityEngine;
 
@@ -75,13 +74,25 @@ internal sealed class CheckoutHoldController
         _productType ??= GameBridge.FindType("ProductCheckoutSpawn");
         if (_productType == null)
             return true;
-        var products = UnityEngine.Object.FindObjectsByType(_productType, FindObjectsInactive.Exclude, FindObjectsSortMode.None).OfType<Component>()
-            .Where(item => item != null && ReadBool(item, "isClient") && ReadBool(item, "isFinished") &&
-                GameBridge.TryGetMemberValue(item, "netId", out var netId) && netId is uint id && id != 0 &&
-                GameBridge.TryGetMemberValue(item, "NetworkcheckoutOBJ", out var owner) && owner is GameObject register && register == _register.gameObject)
-            .OrderBy(item => (item.transform.position - _register.transform.position).sqrMagnitude)
-            .ToArray();
-        var product = products.FirstOrDefault();
+
+        Component? product = null;
+        var nearestDistance = float.PositiveInfinity;
+        var registerObject = _register.gameObject;
+        var registerPosition = _register.transform.position;
+        foreach (var found in UnityEngine.Object.FindObjectsByType(_productType, FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+        {
+            if (found is not Component item || item == null || !ReadBool(item, "isClient") || !ReadBool(item, "isFinished") ||
+                !GameBridge.TryGetMemberValue(item, "netId", out var netId) || netId is not uint id || id == 0 ||
+                !GameBridge.TryGetMemberValue(item, "NetworkcheckoutOBJ", out var owner) || owner is not GameObject register || register != registerObject)
+                continue;
+
+            var distance = (item.transform.position - registerPosition).sqrMagnitude;
+            if (distance >= nearestDistance)
+                continue;
+            nearestDistance = distance;
+            product = item;
+        }
+
         if (product != null)
         {
             var interaction = CheckoutBridge.FindBehaviour(product.transform);
