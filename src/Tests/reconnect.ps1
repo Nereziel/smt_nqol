@@ -26,10 +26,12 @@ using System.Linq;
 using System.Reflection;
 using UnityEngine;
 namespace UnityEngine {
+    public enum FindObjectsInactive { Exclude, Include }
+    public enum FindObjectsSortMode { None }
     public class Object {
         public bool Destroyed;
         public static Object[] Scene = Array.Empty<Object>();
-        public static Object[] FindObjectsOfType(Type type) { return Scene.Where(o => type.IsInstanceOfType(o)).ToArray(); }
+        public static Object[] FindObjectsByType(Type type, FindObjectsInactive inactive, FindObjectsSortMode sort) { return Scene.Where(o => !o.Destroyed && type.IsInstanceOfType(o)).ToArray(); }
         public static bool operator ==(Object? a, Object? b) {
             bool aNull = ReferenceEquals(a, null) || a!.Destroyed;
             bool bNull = ReferenceEquals(b, null) || b!.Destroyed;
