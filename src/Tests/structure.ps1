@@ -35,7 +35,7 @@ foreach ($legacy in @('TryResolveProductId', 'TryReadProductIdDeep', 'LooksLikeP
 }
 
 $project = Get-Content (Join-Path $src '../SMT.NQOL.csproj') -Raw
-if ($project -notmatch '<Version>0\.7\.4</Version>') { throw 'Project version must be 0.7.4.' }
+if ($project -notmatch '<Version>0\.7\.5</Version>') { throw 'Project version must be 0.7.5.' }
 if ($project -notmatch 'BepInEx\.Core"\s+Version="5\.4\.21"') { throw 'BepInEx.Core must be pinned to 5.4.21.' }
 if ($project -match 'BepInEx\.Core"\s+Version="5\.\*"') { throw 'Floating BepInEx package version remains.' }
 
