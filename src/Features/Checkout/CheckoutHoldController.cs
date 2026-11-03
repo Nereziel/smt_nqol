@@ -72,7 +72,7 @@ internal sealed class CheckoutHoldController
             Stop();
             return false;
         }
-        if (_player != FindLocalPlayer() || !_player.isActiveAndEnabled ||
+        if (_player != FindLocalPlayer() || !_player.isActiveAndEnabled || !_register.gameObject.activeInHierarchy ||
             (_player.transform.position - _register.transform.position).sqrMagnitude > 16f ||
             !CheckoutBridge.CanOperate() || ReadBool(_register, "isOccupiedByNPCCashier"))
         {
