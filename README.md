@@ -51,13 +51,16 @@ The checkout helper can automate the repetitive parts of operating a register wh
 Default behavior:
 
 - Hotkey: **right mouse button** (`Mouse1`)
-- Short press: accept/complete the currently aimed cash or card payment
-- Hold for about **0.3 seconds** while aiming at a checkout or belt product: scan products one at a time and continue into payment handling
+- When aiming at offered cash/card or a payment control, a press performs the normal payment helper action first
+- When no payment action is handled, press once while aiming at a checkout or belt product to toggle automatic scanning/payment handling **ON**
+- Press again while aiming at the same checkout or its belt product to toggle automation **OFF**
+- No button needs to remain held while automation is active
 - Waits for the server/game state before submitting the next belt item
 - Caches belt products for the active register and throttles scene-wide fallback discovery
 - Supports exact cash change and card total entry
 - Respects cashier permission checks
-- Stops local automation when the key is released, focus/context is lost, the player changes, or the register is no longer valid
+- Stops automation automatically when focus/context is lost, the player/session changes, the player moves more than 4 m from the register, cashier permission is lost, an NPC cashier takes the register, or the register becomes invalid
+- Opening the F12 menu or disabling/reloading the feature also stops the active checkout automation
 - Includes optional repair for invalid negative checkout `BoxCollider` geometry found on some checkout prefabs
 
 Example configuration:
@@ -66,12 +69,14 @@ Example configuration:
 [Checkout]
 Enabled = true
 ConfirmHotkey = Mouse1
-HoldToScan = true
+ToggleAutomation = true
 ScanInterval = 0.15
 AfterPickupDelay = 1
 ConfirmDelay = 1
 FixNegativeColliders = true
 ```
+
+`ToggleAutomation = true` enables the contextual ON/OFF behavior. The old `HoldToScan` option is no longer read; a stale entry can remain in an existing BepInEx config file without affecting behavior.
 
 `AfterPickupDelay` and `ConfirmDelay` accept values from `0` to `60` seconds.
 
@@ -107,13 +112,15 @@ BepInEx\config\cz.milan.supermarkettogether.pricegun200.cfg
 
 This avoids resetting existing key bindings and settings during the repository/project rename. Existing installations that already saved `MarketPriceMultiplier = 2` will keep that explicit value; `2.01` is the default for fresh/missing settings and can also be selected from the F12 menu.
 
+The checkout automation setting changed in 0.7.5 from `HoldToScan` to `ToggleAutomation`. Existing checkout hotkey, scan interval and payment-delay settings keep the same keys.
+
 ## Multiplayer
 
 The mod is designed as a client-side helper.
 
 For pricing, it attempts to call the game's normal product-price update command path. It does not intentionally bypass host-side permissions or restrictions.
 
-Checkout automation also uses the normal interaction/state paths and requires cashier permission. Commands already sent to the game/server cannot be recalled when a held action is cancelled.
+Checkout automation also uses the normal interaction/state paths and requires cashier permission. Commands already sent to the game/server cannot be recalled when automation is stopped.
 
 Game updates can change internal Unity/PlayMaker objects, so live-game validation may occasionally be required even when the project and regression harnesses still pass.
 
@@ -121,14 +128,15 @@ Game updates can change internal Unity/PlayMaker objects, so live-game validatio
 
 The project intentionally does **not** compile directly against `Assembly-CSharp.dll`.
 
-Runtime integration uses reflection and defensive resolution so the mod can tolerate some internal game changes. Version 0.7.4 also reduces repeated runtime discovery without caching live game values incorrectly:
+Runtime integration uses reflection and defensive resolution so the mod can tolerate some internal game changes. Version 0.7.4 reduced repeated runtime discovery without caching live game values incorrectly, and 0.7.5 keeps those safeguards while changing checkout input to a persistent toggle:
 
 - reflected fields/properties are resolved once per runtime type/member name, while their values are still read live;
 - successful type resolution is cached and missing types are retried after five seconds or immediately when the loaded assembly count changes;
 - the current live player/session objects are rebound instead of permanently caching stale network instances;
 - shelf rows are resolved from live `productInfoArray` data;
-- held checkout keeps a register-scoped product cache and performs scene-wide discovery only as a throttled fallback;
+- checkout automation keeps a register-scoped product cache and performs scene-wide discovery only as a throttled fallback;
 - checkout controls and transaction state are validated before submitting actions;
+- active checkout automation continuously revalidates focus, player, distance, cashier permission and register ownership;
 - product-price updates still go through the game's own update method where possible.
 
 ## Project structure
@@ -205,6 +213,7 @@ pwsh -File src/Tests/pricing.ps1
 pwsh -File src/Tests/optimization.ps1
 pwsh -File src/Tests/reflection-cache.ps1
 pwsh -File src/Tests/checkout-cache.ps1
+pwsh -File src/Tests/checkout-toggle.ps1
 pwsh -File src/Tests/structure.ps1
 pwsh -File src/Tests/verify.ps1
 pwsh -File src/Tests/reconnect.ps1
@@ -213,7 +222,7 @@ pwsh -File src/Tests/shelf-live.ps1
 pwsh -File src/Tests/colliders.ps1
 ```
 
-These cover pricing and cent normalization, reflection/type caching, checkout discovery throttling, source cleanup, scanner/shelf behavior, checkout state and amounts, reconnect/session replacement, cached game context behavior and checkout collider lifecycle.
+These cover pricing and cent normalization, reflection/type caching, checkout discovery throttling, contextual checkout toggle wiring, source cleanup, scanner/shelf behavior, checkout state and amounts, reconnect/session replacement, cached game context behavior and checkout collider lifecycle.
 
 They do not replace live-game testing for rendering, network timing, changed game prefabs or newly changed game internals.
 
@@ -228,7 +237,7 @@ They do not replace live-game testing for rendering, network timing, changed gam
 Push a version tag matching `v*`, for example:
 
 ```text
-v0.7.4
+v0.7.5
 ```
 
 `.github/workflows/release.yml` builds and tests the project, packages the DLL with `README.md` and `LICENSE`, and creates a GitHub Release with a ZIP attachment and generated release notes.
@@ -254,11 +263,9 @@ Useful things to verify first:
 - the configured hotkey is correct;
 - the pricing scanner is equipped when `RequirePricingTool = true`;
 - the player has cashier permission for checkout actions;
-- the aimed object is an actual shelf row/label or checkout control;
+- the aimed object is an actual shelf row/label, checkout control, register, or belt product;
 - a recent game update has not changed the relevant internal objects.
 
 ## License
 
 See [LICENSE](LICENSE).
-
-This is an unofficial mod and is not affiliated with the Supermarket Together developers.
