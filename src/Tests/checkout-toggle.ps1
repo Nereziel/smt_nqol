@@ -31,6 +31,9 @@ if ($hold -notmatch 'sqrMagnitude\s*>\s*16f') {
 if ($hold -notmatch '!CheckoutBridge\.CanOperate\(\)') {
     throw 'Toggle automation must stop when checkout permission/context becomes invalid.'
 }
+if ($hold -notmatch '!_register\.gameObject\.activeInHierarchy') {
+    throw 'Toggle automation must stop when the active checkout becomes inactive.'
+}
 
 $paymentIndex = $plugin.IndexOf('TryConfirmPayment()')
 $toggleIndex = $plugin.IndexOf('.Toggle()')
