@@ -12,7 +12,7 @@ public sealed partial class Plugin : BaseUnityPlugin
 {
     public const string PluginGuid = "cz.milan.supermarkettogether.pricegun200";
     public const string PluginName = "SMT NQOL";
-    public const string PluginVersion = "0.7.4";
+    public const string PluginVersion = "0.7.5";
 
     private ConfigEntry<bool> _enabled = null!;
     private ConfigEntry<bool> _scannerEnabled = null!;
@@ -27,7 +27,7 @@ public sealed partial class Plugin : BaseUnityPlugin
     private ConfigEntry<KeyboardShortcut> _checkoutHotkey = null!;
     private CheckoutBridge? _checkout;
     private CheckoutHoldController? _checkoutHold;
-    private ConfigEntry<bool> _holdToScan = null!;
+    private ConfigEntry<bool> _toggleAutomation = null!;
     private ConfigEntry<float> _scanInterval = null!;
     private ConfigEntry<float> _afterPickupDelay = null!;
     private ConfigEntry<float> _confirmDelay = null!;
@@ -63,10 +63,10 @@ public sealed partial class Plugin : BaseUnityPlugin
         _checkoutEnabled = Config.Bind("Checkout", "Enabled", true,
             "Enable exact cash change and card amount confirmation at the checkout currently being operated.");
         _checkoutHotkey = Config.Bind("Checkout", "ConfirmHotkey", new KeyboardShortcut(KeyCode.Mouse1),
-            "Aim at offered money/card or a cash/card payment control to accept, fill and confirm payment. Mouse1 is the right mouse button.");
+            "Press on offered money/card or a cash/card payment control to confirm it; otherwise press on a checkout or belt item to toggle automation. Mouse1 is the right mouse button.");
 
-        _holdToScan = Config.Bind("Checkout", "HoldToScan", true,
-            "Hold ConfirmHotkey for 0.3 seconds while aiming at a checkout or its belt item to scan and finish payments until released.");
+        _toggleAutomation = Config.Bind("Checkout", "ToggleAutomation", true,
+            "Press ConfirmHotkey while aiming at a checkout or belt item to toggle automatic scanning/payment handling on or off.");
         _scanInterval = Config.Bind("Checkout", "ScanInterval", 0.15f,
             "Minimum seconds between automatic checkout actions. Each scanned item must disappear before another is sent.");
         _scanInterval.Value = Mathf.Clamp(_scanInterval.Value, 0.05f, 2f);
@@ -99,15 +99,22 @@ public sealed partial class Plugin : BaseUnityPlugin
         }
         try
         {
-            var holdConsumed = _checkoutHold?.Tick(_checkoutEnabled.Value && _holdToScan.Value && _checkoutHotkey.Value.IsPressed(), _scanInterval.Value) ?? false;
-            // Payment has priority when both configurable shortcuts share the same key.
+            var automationEnabled = _checkoutEnabled.Value && _toggleAutomation.Value;
+            if (!automationEnabled)
+                _checkoutHold?.Stop();
+
+            // Manual payment has priority over the contextual automation toggle.
             if (_checkoutEnabled.Value && _checkout != null && _checkoutHotkey.Value.IsDown())
             {
                 DebugLog($"Checkout hotkey pressed: {_checkoutHotkey.Value}.");
                 if (_checkout.TryConfirmPayment())
                     return;
+                if (automationEnabled && _checkoutHold?.Toggle() == true)
+                    return;
             }
-            if (_scannerEnabled.Value && !holdConsumed && _hotkey.Value.IsDown())
+
+            var automationConsumed = automationEnabled && (_checkoutHold?.Tick(_scanInterval.Value) ?? false);
+            if (_scannerEnabled.Value && !automationConsumed && _hotkey.Value.IsDown())
                 TrySetAimedProductPrice();
         }
         catch (Exception ex)

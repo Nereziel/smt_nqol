@@ -24,7 +24,7 @@ public sealed partial class Plugin
 
     private sealed class MenuDraft
     {
-        internal bool Enabled, Scanner, RequireScanner, Checkout, Hold, Debug, FixColliders;
+        internal bool Enabled, Scanner, RequireScanner, Checkout, Toggle, Debug, FixColliders;
         internal string Multiplier = "", Distance = "", Interval = "", PickupDelay = "", ConfirmDelay = "";
         internal KeyboardShortcut ScannerKey;
         internal KeyboardShortcut CheckoutKey;
@@ -167,14 +167,14 @@ public sealed partial class Plugin
         GUILayout.Label("POKLADNA – skenování a platby");
         _draft.Checkout = GUILayout.Toggle(_draft.Checkout, "Zapnout pomoc na pokladně");
         _draft.FixColliders = GUILayout.Toggle(_draft.FixColliders, "Opravit vadné collidery zrcadlených pokladen");
-        _draft.Hold = GUILayout.Toggle(_draft.Hold, "Držením tlačítka skenovat pás a zpracovat platbu");
+        _draft.Toggle = GUILayout.Toggle(_draft.Toggle, "Kliknutím zapnout/vypnout automatické skenování a platby");
         KeyRow("Tlačítko pokladny", _draft.CheckoutKey, 2);
         NumberRow("Interval skenování (0.05–2 s)", ref _draft.Interval);
         NumberRow("Po převzetí karty/hotovosti (0–60 s)", ref _draft.PickupDelay);
         NumberRow("Před potvrzením platby/vrácení (0–60 s)", ref _draft.ConfirmDelay);
         GUILayout.Space(8);
         _draft.Debug = GUILayout.Toggle(_draft.Debug, "Podrobný debug log");
-        GUILayout.Label("Mouse0 = levé, Mouse1 = pravé, Mouse2 = prostřední.\nZměna tlačítka čeká na stisk; Esc ji zruší. F12 je vyhrazené menu.");
+        GUILayout.Label("Mouse0 = levé, Mouse1 = pravé, Mouse2 = prostřední.\nNa platebním prvku má kliknutí přednost; na pokladně/pásu stejné tlačítko přepíná automatiku. Esc zruší změnu tlačítka. F12 je vyhrazené menu.");
         GUILayout.EndScrollView();
         GUILayout.Label(_menuMessage);
         GUILayout.BeginHorizontal();
@@ -209,7 +209,7 @@ public sealed partial class Plugin
         _captureKey = 0;
         _draft = new MenuDraft {
             Enabled = _enabled.Value, Scanner = _scannerEnabled.Value, RequireScanner = _requirePricingTool.Value,
-            Checkout = _checkoutEnabled.Value, Hold = _holdToScan.Value, Debug = _debugLogging.Value, FixColliders = _fixCheckoutColliders.Value,
+            Checkout = _checkoutEnabled.Value, Toggle = _toggleAutomation.Value, Debug = _debugLogging.Value, FixColliders = _fixCheckoutColliders.Value,
             Multiplier = NumberText(_multiplier.Value), Distance = NumberText(_maxDistance.Value), Interval = NumberText(_scanInterval.Value),
             PickupDelay = NumberText(_afterPickupDelay.Value), ConfirmDelay = NumberText(_confirmDelay.Value),
             ScannerKey = _hotkey.Value, CheckoutKey = _checkoutHotkey.Value
@@ -238,7 +238,7 @@ public sealed partial class Plugin
             _requirePricingTool.Value = _draft.RequireScanner;
             _checkoutEnabled.Value = _draft.Checkout;
             _fixCheckoutColliders.Value = _draft.FixColliders;
-            _holdToScan.Value = _draft.Hold;
+            _toggleAutomation.Value = _draft.Toggle;
             _debugLogging.Value = _draft.Debug;
             _multiplier.Value = multiplier;
             _maxDistance.Value = distance;
@@ -294,6 +294,8 @@ public sealed partial class Plugin
     private void OnDestroy()
     {
         _colliderRepair?.Dispose();
+        _checkoutHold?.Stop();
+        _checkout?.StopHeldPayment();
         CloseMenu();
         if (_opaqueBackground != null) Destroy(_opaqueBackground);
         _opaqueBackground = null;

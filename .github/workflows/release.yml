@@ -55,6 +55,10 @@ jobs:
         shell: pwsh
         run: pwsh -NoProfile -File ./src/Tests/checkout-cache.ps1
 
+      - name: Regression - checkout toggle
+        shell: pwsh
+        run: pwsh -NoProfile -File ./src/Tests/checkout-toggle.ps1
+
       - name: Regression - source structure
         shell: pwsh
         run: pwsh -NoProfile -File ./src/Tests/structure.ps1

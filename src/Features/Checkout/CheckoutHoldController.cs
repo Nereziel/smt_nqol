@@ -17,10 +17,7 @@ internal sealed class CheckoutHoldController
     private Component? _pendingItem;
     private Type? _productType;
     private GameObject? _productCacheRegister;
-    private bool _held;
-    private bool _automating;
-    private bool _blocked;
-    private float _startedAt;
+    private bool _active;
     private float _nextAction;
     private float _sentAt;
     private bool _warnedWait;
@@ -31,46 +28,66 @@ internal sealed class CheckoutHoldController
         _log = log;
     }
 
-    internal bool Tick(bool held, float interval)
+    internal bool Toggle()
     {
-        // A released/repressed key must not submit an item twice while its command is in flight.
-        _scanGate.Observe(_scanGate.PendingItemId, _pendingItem != null);
-        if (!held || !Application.isFocused)
+        if (!Application.isFocused)
         {
             Stop();
             return false;
         }
-        if (!_held)
+
+        var aimedRegister = _checkout.FindHoldCheckout();
+        if (_active)
         {
-            _held = true;
-            _startedAt = Time.unscaledTime;
-            _register = _checkout.FindHoldCheckout();
-            _player = FindLocalPlayer();
-            _blocked = _register == null || _player == null;
-            ResetProductCache();
+            if (aimedRegister == null || _register == null || aimedRegister.gameObject != _register.gameObject)
+                return false;
+
+            _log.LogInfo("Checkout automation toggled OFF.");
+            Stop();
+            return true;
         }
-        if (_blocked || _register == null || _player == null)
+
+        var player = FindLocalPlayer();
+        if (aimedRegister == null || player == null || !player.isActiveAndEnabled ||
+            !CheckoutBridge.CanOperate() || ReadBool(aimedRegister, "isOccupiedByNPCCashier"))
             return false;
-        if (Time.unscaledTime - _startedAt < 0.3f)
-            return true;
-        _automating = true;
-        if (Time.unscaledTime < _nextAction)
-            return true;
-        _nextAction = Time.unscaledTime + interval;
-        if (_player != FindLocalPlayer() || !_player.isActiveAndEnabled ||
+
+        _register = aimedRegister;
+        _player = player;
+        _active = true;
+        _nextAction = 0f;
+        ResetProductCache();
+        _log.LogInfo("Checkout automation toggled ON.");
+        return true;
+    }
+
+    internal bool Tick(float interval)
+    {
+        // A stopped/restarted toggle must not submit an item twice while its command is in flight.
+        _scanGate.Observe(_scanGate.PendingItemId, _pendingItem != null);
+        if (!_active)
+            return false;
+        if (!Application.isFocused || _register == null || _player == null)
+        {
+            Stop();
+            return false;
+        }
+        if (_player != FindLocalPlayer() || !_player.isActiveAndEnabled || !_register.gameObject.activeInHierarchy ||
             (_player.transform.position - _register.transform.position).sqrMagnitude > 16f ||
             !CheckoutBridge.CanOperate() || ReadBool(_register, "isOccupiedByNPCCashier"))
         {
-            _checkout.StopHeldPayment();
-            _blocked = true;
-            return true;
+            Stop();
+            return false;
         }
+        if (Time.unscaledTime < _nextAction)
+            return true;
+        _nextAction = Time.unscaledTime + interval;
         if (!_scanGate.CanSubmit)
         {
             if (!_warnedWait && Time.unscaledTime - _sentAt > 5f)
             {
                 _warnedWait = true;
-                _log.LogWarning("Held checkout is waiting for the server to remove the scanned item; no duplicate scan will be sent.");
+                _log.LogWarning("Checkout automation is waiting for the server to remove the scanned item; no duplicate scan will be sent.");
             }
             return true;
         }
@@ -156,11 +173,9 @@ internal sealed class CheckoutHoldController
 
     internal void Stop()
     {
-        if (_automating)
+        if (_active)
             _checkout.StopHeldPayment();
-        _held = false;
-        _automating = false;
-        _blocked = false;
+        _active = false;
         _register = null;
         _player = null;
         _nextAction = 0f;
